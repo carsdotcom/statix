@@ -1,7 +1,9 @@
 runtime_config? = System.get_env("STATIX_TEST_RUNTIME_CONFIG") in ["1", "true"]
 
 defmodule StatixTest do
-  use Statix.TestCase
+  @server_port 8525
+
+  use Statix.TestCase, port: @server_port
 
   import ExUnit.CaptureLog
 
@@ -17,7 +19,7 @@ defmodule StatixTest do
   end
 
   setup do
-    connect()
+    connect(port: @server_port)
   end
 
   test "increment/1,2,3" do
@@ -151,6 +153,24 @@ defmodule StatixTest do
     assert_receive {:test_server, _, "sample:3|s|@1.0|#foo,bar"}
 
     set("sample", 3, sample_rate: 0.0)
+
+    refute_received _any
+  end
+
+  test "distribution/2,3" do
+    __MODULE__.distribution(["sample"], 2)
+    assert_receive {:test_server, _, "sample:2|d"}
+
+    distribution("sample", 2.1)
+    assert_receive {:test_server, _, "sample:2.1|d"}
+
+    distribution("sample", 3, tags: ["foo:bar", "baz"])
+    assert_receive {:test_server, _, "sample:3|d|#foo:bar,baz"}
+
+    distribution("sample", 3, sample_rate: 1.0, tags: ["foo", "bar"])
+    assert_receive {:test_server, _, "sample:3|d|@1.0|#foo,bar"}
+
+    distribution("sample", 3, sample_rate: 0.0)
 
     refute_received _any
   end
